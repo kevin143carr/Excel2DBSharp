@@ -11,30 +11,11 @@ optional JSON-based column mappings, defaults, and header offsets.
 Repository: https://github.com/kevin143carr/Excel2DBSharp
 
 MIT License
-
-Copyright (c) 2026 Kevin Carr
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 */
 
 using System;
 using System.Collections.Generic;
+using System.Formats.Asn1;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -63,6 +44,17 @@ class Program
         }
     }
 
+    static bool ParseBool(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        return value.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || value == "1"
+            || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    }
+
+
     static int ImportFile(string[] args)
     {
         string? file = null;
@@ -86,6 +78,21 @@ class Program
                 continue;
             }
 
+            if (arg.StartsWith("--dry-run"))
+            {
+                if (arg.Contains('='))
+                {
+                    var parts = arg.Split('=', 2);
+                    dryRun = ParseBool(parts[1]);
+                }
+                else
+                {
+                    dryRun = true;
+                }
+                continue;
+            }
+
+            // Require = sign
             int eqIndex = arg.IndexOf('=');
             if (eqIndex < 0)
                 throw new Exception($"Argument '{arg}' must use '=' (e.g., --table=MyTable)");
@@ -110,14 +117,10 @@ class Program
                 case "--sheet-index":
                     sheetIndex = int.Parse(value);
                     break;
-                case "--dry-run":
-                    dryRun = true; // optional flag, can ignore value
-                    break;
                 default:
                     throw new Exception($"Unknown argument: {key}");
             }
         }
-
 
         if (string.IsNullOrWhiteSpace(file) ||
             string.IsNullOrWhiteSpace(sqlFile) ||
@@ -130,8 +133,7 @@ class Program
 
         var mappingData = LoadMapping(mapping);
 
-        // Handle header row (1-based in JSON, convert to 0-based for list)
-        int headerRow1Based = mappingData.HeaderRow ?? 2; // default to row 2
+        int headerRow1Based = mappingData.HeaderRow ?? 2;
         int headerRow = headerRow1Based - 1;
 
         var allRows = LoadSheet(file, sheet, sheetIndex);
@@ -142,7 +144,6 @@ class Program
         var headers = allRows[headerRow];
         var dataRows = allRows.Skip(headerRow + 1).ToList();
 
-        // Build header index dictionary for fast lookup
         var headerIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < headers.Count; i++)
         {
@@ -185,28 +186,25 @@ class Program
                 {
                     var normalizedSource = sourceCol.Trim();
                     if (!headerIndex.TryGetValue(normalizedSource, out int idx))
-                    {
-                        Console.WriteLine($"Warning: Source column '{sourceCol}' not found in headers");
                         continue;
-                    }
 
                     object? cellValue = idx < row.Count ? row[idx] : null;
                     if (cellValue != null && !string.IsNullOrWhiteSpace(cellValue.ToString()))
                     {
                         chosenValue = cellValue;
-                        break; // first non-empty source
+                        break;
                     }
                 }
 
-                // fallback to default if no source value found
                 if (chosenValue == null)
                     columnDefaults.TryGetValue(col, out chosenValue);
 
                 values.Add(InferSqlValue(chosenValue));
             }
 
-            var stmt = $"INSERT INTO {table} ({string.Join(", ", finalColumns)}) VALUES ({string.Join(", ", values)});";
-            insertStatements.Add(stmt);
+            insertStatements.Add(
+                $"INSERT INTO {table} ({string.Join(", ", finalColumns)}) VALUES ({string.Join(", ", values)});"
+            );
         }
 
         if (dryRun)
@@ -227,25 +225,22 @@ class Program
 
     static string InferSqlValue(object? val)
     {
-        if (val == null)
-            return "NULL";
+        if (val == null) return "NULL";
 
         var s = val.ToString()?.Trim();
-        if (string.IsNullOrEmpty(s))
-            return "NULL";
+        if (string.IsNullOrEmpty(s)) return "NULL";
 
-        return "'" + s.Replace("'", "''") + "'";
+        return $"'{s.Replace("'", "''")}'";
     }
 
     static Mapping LoadMapping(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            return new Mapping();
+        if (string.IsNullOrWhiteSpace(path)) return new Mapping();
 
         var json = File.ReadAllText(path);
-        var mapping = JsonSerializer.Deserialize<Mapping>(json,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
+        // Use source-generated context
+        var mapping = JsonSerializer.Deserialize(json, MappingJsonContext.Default.Mapping);
         return mapping ?? new Mapping();
     }
 
@@ -272,14 +267,13 @@ class Program
             using var wb = new XLWorkbook(file);
             var ws = sheet != null ? wb.Worksheet(sheet) : wb.Worksheet(sheetIndex ?? 1);
 
-            // Determine maximum number of columns in the sheet
             int colCount = ws.RowsUsed().Max(r => r.LastCellUsed()?.Address.ColumnNumber ?? 0);
 
             foreach (var wsRow in ws.RowsUsed())
             {
                 var row = new List<object?>();
-                for (int i = 1; i <= colCount; i++) // Excel cells are 1-based
-                    row.Add(wsRow.Cell(i).Value);   // even empty cells are included
+                for (int i = 1; i <= colCount; i++)
+                    row.Add(wsRow.Cell(i).Value);
                 rows.Add(row);
             }
         }
@@ -287,36 +281,14 @@ class Program
         return rows;
     }
 
-
-    static string GetNextArg(string[] args, ref int i)
-    {
-        if (i + 1 >= args.Length)
-            throw new Exception($"Missing value for {args[i]}");
-
-        return args[++i];
-    }
-
     static void ShowHelp()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  Excel2DBSharp <file> --sql-file <out.sql> --table <table> [options]");
-        Console.WriteLine();
+        Console.WriteLine("  Excel2DBSharp <file> --sql-file=<out.sql> --table=<table> [options]");
         Console.WriteLine("Options:");
-        Console.WriteLine("  --mapping <file.json>");
-        Console.WriteLine("  --sheet <name>");
-        Console.WriteLine("  --sheet-index <n>");
+        Console.WriteLine("  --mapping=<file.json>");
+        Console.WriteLine("  --sheet=<name>");
+        Console.WriteLine("  --sheet-index=<n>");
         Console.WriteLine("  --dry-run");
     }
-}
-
-class Mapping
-{
-    public int? HeaderRow { get; set; }
-    public Dictionary<string, ColumnConfig> Columns { get; set; } = new();
-}
-
-class ColumnConfig
-{
-    public List<string> Sources { get; set; } = new();
-    public object? Default { get; set; }
 }

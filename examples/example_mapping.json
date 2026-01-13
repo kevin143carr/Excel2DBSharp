@@ -1,0 +1,28 @@
+{
+  "header_row": 1,
+  "columns": {
+    "first_name": {
+      "sources": [
+        "First Name"
+      ]
+    },
+    "last_name": {
+      "sources": [
+        "Last Name"
+      ]
+    },
+    "email": {
+      "sources": [
+        "Email",
+        "Alt Email"
+      ],
+      "default": "unknown@example.com"
+    },
+    "age": {
+      "sources": [
+        "Age"
+      ],
+      "default": 0
+    }
+  }
+}

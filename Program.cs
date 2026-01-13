@@ -33,7 +33,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -76,34 +75,49 @@ class Program
 
         for (int i = 0; i < args.Length; i++)
         {
-            if (!args[i].StartsWith("--") && file == null)
+            string arg = args[i];
+
+            if (!arg.StartsWith("--"))
             {
-                file = args[i];
+                if (file == null)
+                    file = arg;
+                else
+                    throw new Exception($"Unexpected argument: {arg}");
                 continue;
             }
 
-            switch (args[i])
+            int eqIndex = arg.IndexOf('=');
+            if (eqIndex < 0)
+                throw new Exception($"Argument '{arg}' must use '=' (e.g., --table=MyTable)");
+
+            string key = arg[..eqIndex];
+            string value = arg[(eqIndex + 1)..];
+
+            switch (key)
             {
                 case "--sql-file":
-                    sqlFile = GetNextArg(args, ref i);
+                    sqlFile = value;
                     break;
                 case "--table":
-                    table = GetNextArg(args, ref i);
+                    table = value;
                     break;
                 case "--mapping":
-                    mapping = GetNextArg(args, ref i);
+                    mapping = value;
                     break;
                 case "--sheet":
-                    sheet = GetNextArg(args, ref i);
+                    sheet = value;
                     break;
                 case "--sheet-index":
-                    sheetIndex = int.Parse(GetNextArg(args, ref i));
+                    sheetIndex = int.Parse(value);
                     break;
                 case "--dry-run":
-                    dryRun = true;
+                    dryRun = true; // optional flag, can ignore value
                     break;
+                default:
+                    throw new Exception($"Unknown argument: {key}");
             }
         }
+
 
         if (string.IsNullOrWhiteSpace(file) ||
             string.IsNullOrWhiteSpace(sqlFile) ||
@@ -116,29 +130,29 @@ class Program
 
         var mappingData = LoadMapping(mapping);
 
-        int headerRow1Based = mappingData.HeaderRow ?? 1;
-        if (headerRow1Based < 1)
-            throw new Exception("header_row must be 1 or greater");
-
+        // Handle header row (1-based in JSON, convert to 0-based for list)
+        int headerRow1Based = mappingData.HeaderRow ?? 2; // default to row 2
         int headerRow = headerRow1Based - 1;
 
         var allRows = LoadSheet(file, sheet, sheetIndex);
 
-        if (headerRow >= allRows.Count)
-            throw new Exception($"header_row {headerRow1Based} is out of range. File has only {allRows.Count} rows.");
+        if (headerRow < 0 || headerRow >= allRows.Count)
+            throw new Exception($"Header row {headerRow1Based} is out of range. File has {allRows.Count} rows.");
 
         var headers = allRows[headerRow];
-        var rows = allRows.Skip(headerRow + 1).ToList();
+        var dataRows = allRows.Skip(headerRow + 1).ToList();
 
+        // Build header index dictionary for fast lookup
         var headerIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < headers.Count; i++)
         {
             var headerName = headers[i]?.ToString()?.Trim();
             if (!string.IsNullOrEmpty(headerName))
-            {
                 headerIndex[headerName] = i;
-            }
         }
+
+        Console.WriteLine("Detected headers:");
+        foreach (var h in headers) Console.WriteLine($"- '{h}'");
 
         if (mappingData.Columns == null || mappingData.Columns.Count == 0)
             throw new Exception("Mapping file must contain a 'columns' section.");
@@ -159,7 +173,7 @@ class Program
 
         var insertStatements = new List<string>();
 
-        foreach (var row in rows)
+        foreach (var row in dataRows)
         {
             var values = new List<string>();
 
@@ -169,27 +183,29 @@ class Program
 
                 foreach (var sourceCol in columnSources[col])
                 {
-                    if (!headerIndex.TryGetValue(sourceCol, out int idx))
+                    var normalizedSource = sourceCol.Trim();
+                    if (!headerIndex.TryGetValue(normalizedSource, out int idx))
+                    {
+                        Console.WriteLine($"Warning: Source column '{sourceCol}' not found in headers");
                         continue;
+                    }
 
                     object? cellValue = idx < row.Count ? row[idx] : null;
-
                     if (cellValue != null && !string.IsNullOrWhiteSpace(cellValue.ToString()))
                     {
                         chosenValue = cellValue;
-                        break;
+                        break; // first non-empty source
                     }
                 }
 
+                // fallback to default if no source value found
                 if (chosenValue == null)
                     columnDefaults.TryGetValue(col, out chosenValue);
 
                 values.Add(InferSqlValue(chosenValue));
             }
 
-            var stmt =
-                $"INSERT INTO {table} ({string.Join(", ", finalColumns)}) VALUES ({string.Join(", ", values)});";
-
+            var stmt = $"INSERT INTO {table} ({string.Join(", ", finalColumns)}) VALUES ({string.Join(", ", values)});";
             insertStatements.Add(stmt);
         }
 
@@ -236,11 +252,10 @@ class Program
     static List<List<object?>> LoadSheet(string file, string? sheet, int? sheetIndex)
     {
         var ext = Path.GetExtension(file).ToLowerInvariant();
+        var rows = new List<List<object?>>();
 
         if (ext == ".csv")
         {
-            var rows = new List<List<object?>>();
-
             using var reader = new StreamReader(file);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
 
@@ -249,33 +264,29 @@ class Program
                 var row = new List<object?>();
                 for (int i = 0; csv.TryGetField(i, out string? field); i++)
                     row.Add(field);
-
                 rows.Add(row);
             }
-
-            return rows;
         }
         else
         {
             using var wb = new XLWorkbook(file);
-            var ws = sheet != null
-                ? wb.Worksheet(sheet)
-                : wb.Worksheet(sheetIndex ?? 1);
+            var ws = sheet != null ? wb.Worksheet(sheet) : wb.Worksheet(sheetIndex ?? 1);
 
-            var rows = new List<List<object?>>();
+            // Determine maximum number of columns in the sheet
+            int colCount = ws.RowsUsed().Max(r => r.LastCellUsed()?.Address.ColumnNumber ?? 0);
 
-            foreach (var r in ws.RowsUsed())
+            foreach (var wsRow in ws.RowsUsed())
             {
                 var row = new List<object?>();
-                foreach (var c in r.CellsUsed())
-                    row.Add(c.Value);
-
+                for (int i = 1; i <= colCount; i++) // Excel cells are 1-based
+                    row.Add(wsRow.Cell(i).Value);   // even empty cells are included
                 rows.Add(row);
             }
-
-            return rows;
         }
+
+        return rows;
     }
+
 
     static string GetNextArg(string[] args, ref int i)
     {

@@ -11,7 +11,7 @@ This folder contains a working example of Excel2DB.
 ## Example Command
 
 ```bash
-excel2db import-file sample_people.xlsx   --sql-file output.sql   --table people   --mapping mapping.json
+dotnet run -- sample_people.xlsx --sql-file=output.sql --table=people --mapping=example_mapping.json
 ```
 
 ## Features Demonstrated
@@ -28,7 +28,7 @@ Empty cells become NULL unless a default is specified.
 ### Dry Run
 
 ```bash
-excel2db import-file sample_people.csv   --sql-file output.sql   --table people   --mapping mapping.json   --dry-run
+dotnet run -- sample_people.csv --sql-file=output.sql --table=people --mapping=example_mapping.json --dry-run
 ```
 
 This will show the first 5 INSERT statements without writing the file.

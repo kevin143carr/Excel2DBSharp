@@ -133,7 +133,7 @@ class Program
 
         var mappingData = LoadMapping(mapping);
 
-        int headerRow1Based = mappingData.HeaderRow ?? 2;
+        int headerRow1Based = mappingData.HeaderRow ?? 1;
         int headerRow = headerRow1Based - 1;
 
         var allRows = LoadSheet(file, sheet, sheetIndex);

@@ -41,18 +41,18 @@ This allows:
 
 ## Installation
 
-### 1. Python 3.9+
+### 1. Install .NET 8 SDK
 
 Check version:
 
 ```bash
-python3 --version
+dotnet --version
 ```
 
-### 2. Install dependencies
+### 2. Restore and build (optional)
 
 ```bash
-pip install typer pyexcel pyexcel-xlsx
+dotnet build
 ```
 
 ---
@@ -97,10 +97,10 @@ Published artifacts are written to `dist/<rid>/`.
 ## Basic Usage
 
 ```bash
-python excel2db.py import-file input.xlsx \
-  --sql-file output.sql \
-  --table my_schema.my_table \
-  --mapping mapping.json
+dotnet run -- input.xlsx \
+  --sql-file=output.sql \
+  --table=my_schema.my_table \
+  --mapping=mapping.json
 ```
 
 ### Optional Flags

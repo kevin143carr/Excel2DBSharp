@@ -6,11 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Single-file build options -->
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-
     <!-- Optional: Icon -->
     <ApplicationIcon>excel2db.ico</ApplicationIcon>
   </PropertyGroup>

@@ -57,6 +57,43 @@ pip install typer pyexcel pyexcel-xlsx
 
 ---
 
+## Publish (Platform-Specific)
+
+Use the platform-specific publish scripts in the repository root:
+
+```bash
+./publish-osx-x64.sh
+./publish-linux-x64.sh
+```
+
+Add `--include-pdb` to keep `.pdb` symbol files in the publish output (default omits them).
+
+On Windows (`cmd.exe`):
+
+```bat
+publish-win-x64.bat
+```
+
+```bat
+publish-win-x64.bat --include-pdb
+```
+
+Convenience wrappers:
+
+```bash
+./publish-all.sh
+```
+
+```bat
+publish-all.bat
+```
+
+Both `publish-all` scripts publish all supported targets: `win-x64`, `osx-x64`, and `linux-x64`.
+
+Published artifacts are written to `dist/<rid>/`.
+
+---
+
 ## Basic Usage
 
 ```bash

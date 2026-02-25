@@ -173,6 +173,8 @@ class Program
         }
 
         var insertStatements = new List<string>();
+        var quotedTable = QuoteSqlIdentifier(table);
+        var quotedColumns = finalColumns.Select(QuoteSqlIdentifier).ToList();
 
         foreach (var row in dataRows)
         {
@@ -203,7 +205,7 @@ class Program
             }
 
             insertStatements.Add(
-                $"INSERT INTO {table} ({string.Join(", ", finalColumns)}) VALUES ({string.Join(", ", values)});"
+                $"INSERT INTO {quotedTable} ({string.Join(", ", quotedColumns)}) VALUES ({string.Join(", ", values)});"
             );
         }
 
@@ -231,6 +233,14 @@ class Program
         if (string.IsNullOrEmpty(s)) return "NULL";
 
         return $"'{s.Replace("'", "''")}'";
+    }
+
+    static string QuoteSqlIdentifier(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            throw new Exception("SQL identifier cannot be empty.");
+
+        return $"[{identifier.Trim().Replace("]", "]]")}]";
     }
 
     static Mapping LoadMapping(string? path)
@@ -267,9 +277,13 @@ class Program
             using var wb = new XLWorkbook(file);
             var ws = sheet != null ? wb.Worksheet(sheet) : wb.Worksheet(sheetIndex ?? 1);
 
-            int colCount = ws.RowsUsed().Max(r => r.LastCellUsed()?.Address.ColumnNumber ?? 0);
+            var usedRows = ws.RowsUsed().ToList();
+            if (usedRows.Count == 0)
+                throw new Exception($"Worksheet '{ws.Name}' is empty.");
 
-            foreach (var wsRow in ws.RowsUsed())
+            int colCount = usedRows.Max(r => r.LastCellUsed()?.Address.ColumnNumber ?? 0);
+
+            foreach (var wsRow in usedRows)
             {
                 var row = new List<object?>();
                 for (int i = 1; i <= colCount; i++)

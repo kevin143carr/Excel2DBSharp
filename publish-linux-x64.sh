@@ -25,7 +25,7 @@ if [[ "$INCLUDE_PDB" == true ]]; then
 fi
 
 echo "Publishing Excel2DBSharp for $RID..."
-dotnet publish -c Release -r "$RID" \
+dotnet publish Excel2DBSharp.csproj -c Release -r "$RID" \
   /p:PublishSingleFile=true \
   /p:SelfContained=true \
   /p:PublishTrimmed=true \

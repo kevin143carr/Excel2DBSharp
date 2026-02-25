@@ -1,7 +1,7 @@
 # Excel2DBSharp
 ## Powered by Wing IDE 11 https://wingware.com
 
-Excel2DB is a lightweight command-line tool for macOS, Windows, and Linux that converts Excel or CSV spreadsheets into SQL `INSERT` statements.
+Excel2DBSharp is a lightweight command-line tool for macOS, Windows, and Linux that converts Excel or CSV spreadsheets into SQL `INSERT` statements.
 
 It is designed for controlled, auditable imports where you want to **review the SQL before running it**.
 
@@ -9,7 +9,7 @@ It is designed for controlled, auditable imports where you want to **review the 
 
 ## What This Tool Actually Does
 
-Excel2DB performs **column mapping**, not just renaming.
+Excel2DBSharp performs **column mapping**, not just renaming.
 
 You explicitly map:
 
@@ -27,7 +27,7 @@ This allows:
 
 ## Features
 
-✔ Excel (.xlsx, .xls) and CSV support
+✔ Excel (.xlsx) and CSV support
 ✔ Explicit column mapping
 ✔ Fallback source columns
 ✔ Default values per column
@@ -54,6 +54,8 @@ dotnet --version
 ```bash
 dotnet build
 ```
+
+Or publish a platform binary and run it from `dist/<rid>/` (see examples below).
 
 ---
 
@@ -96,11 +98,28 @@ Published artifacts are written to `dist/<rid>/`.
 
 ## Basic Usage
 
+macOS (published binary):
+
 ```bash
-dotnet run -- input.xlsx \
+./dist/osx-x64/Excel2DBSharp input.xlsx \
   --sql-file=output.sql \
   --table=my_schema.my_table \
   --mapping=mapping.json
+```
+
+Linux (published binary):
+
+```bash
+./dist/linux-x64/Excel2DBSharp input.xlsx \
+  --sql-file=output.sql \
+  --table=my_schema.my_table \
+  --mapping=mapping.json
+```
+
+Windows (published binary):
+
+```bat
+dist\win-x64\Excel2DBSharp.exe input.xlsx --sql-file=output.sql --table=my_schema.my_table --mapping=mapping.json
 ```
 
 ### Optional Flags
@@ -108,7 +127,7 @@ dotnet run -- input.xlsx \
 | Option          | Description                 |
 | --------------- | --------------------------- |
 | `--sheet`       | Excel sheet name            |
-| `--sheet-index` | Excel sheet index (0-based) |
+| `--sheet-index` | Excel sheet index (1-based) |
 | `--dry-run`     | Preview first 5 INSERTs     |
 
 ---
@@ -116,6 +135,7 @@ dotnet run -- input.xlsx \
 ## Mapping File Format
 
 The mapping file controls how spreadsheet columns map into database columns.
+The mapping file must contain a `columns` section.
 
 ---
 

@@ -6,12 +6,24 @@ This folder contains a working example of Excel2DB.
 
 - sample_people.csv
 - sample_people.xlsx
-- mapping.json
+- example_mapping.json
 
 ## Example Command
 
+macOS/Linux (published binary examples):
+
 ```bash
-dotnet run -- sample_people.xlsx --sql-file=output.sql --table=people --mapping=example_mapping.json
+../dist/osx-x64/Excel2DBSharp sample_people.xlsx --sql-file=output.sql --table=people --mapping=example_mapping.json
+```
+
+```bash
+../dist/linux-x64/Excel2DBSharp sample_people.xlsx --sql-file=output.sql --table=people --mapping=example_mapping.json
+```
+
+Windows (published binary):
+
+```bat
+..\dist\win-x64\Excel2DBSharp.exe sample_people.xlsx --sql-file=output.sql --table=people --mapping=example_mapping.json
 ```
 
 ## Features Demonstrated
@@ -28,7 +40,7 @@ Empty cells become NULL unless a default is specified.
 ### Dry Run
 
 ```bash
-dotnet run -- sample_people.csv --sql-file=output.sql --table=people --mapping=example_mapping.json --dry-run
+../dist/osx-x64/Excel2DBSharp sample_people.csv --sql-file=output.sql --table=people --mapping=example_mapping.json --dry-run
 ```
 
 This will show the first 5 INSERT statements without writing the file.

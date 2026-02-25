@@ -22,7 +22,7 @@ exit /b 1
 :after_parse
 
 echo Publishing Excel2DBSharp for %rid%...
-dotnet publish -c Release -r %rid% ^
+dotnet publish Excel2DBSharp.csproj -c Release -r %rid% ^
   /p:PublishSingleFile=true ^
   /p:SelfContained=true ^
   /p:PublishTrimmed=true ^
